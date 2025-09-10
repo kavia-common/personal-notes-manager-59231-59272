@@ -1,0 +1,154 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// Generate static paths only for "new" page; edits load client-side by ID after navigation.
+export async function getStaticPaths() {
+  return [
+    { params: { id: 'new' } }
+  ];
+}
+
+const { id } = Astro.params;
+// When id is "new", we'll render an empty form; otherwise it loads the note client-side.
+---
+
+<Layout>
+  <main class="container">
+    <header class="header">
+      <a class="btn" href="/">← Back</a>
+      <h1 class="app-title">{id === 'new' ? 'New Note' : 'Edit Note'}</h1>
+      <div style="flex:1"></div>
+      {id !== 'new' && <button id="deleteBtn" class="btn danger">Delete</button>}
+    </header>
+
+    <section class="form-wrap">
+      <form id="noteForm" novalidate>
+        <div class="field">
+          <label for="title">Title</label>
+          <input id="title" name="title" type="text" placeholder="Note title" required />
+          <small class="hint">Give your note a short descriptive title.</small>
+        </div>
+
+        <div class="field">
+          <label for="content">Content</label>
+          <textarea id="content" name="content" rows="12" placeholder="Write your note..."></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">{id === 'new' ? 'Create' : 'Save changes'}</button>
+          <a class="btn" href="/">Cancel</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import { api } from '../../services/api.ts';
+
+    const isNew = {id} === 'new';
+    const form = document.getElementById('noteForm');
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('content');
+    const deleteBtn = document.getElementById('deleteBtn');
+
+    async function hydrate() {
+      if (isNew) return;
+      try {
+        const note = await api.getNote('{id}');
+        if (!note) {
+          alert('Note not found');
+          window.location.href = '/';
+          return;
+        }
+        titleEl.value = note.title || '';
+        contentEl.value = note.content || '';
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load note');
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = titleEl.value.trim();
+      const content = contentEl.value;
+
+      if (!title) {
+        titleEl.focus();
+        alert('Title is required.');
+        return;
+      }
+
+      try {
+        if (isNew) {
+          const created = await api.createNote({ title, content });
+          window.location.href = '/';
+        } else {
+          await api.updateNote('{id}', { title, content });
+          window.location.href = '/';
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save note. Please try again.');
+      }
+    });
+
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        const ok = confirm('Delete this note? This cannot be undone.');
+        if (!ok) return;
+        try {
+          await api.deleteNote('{id}');
+          window.location.href = '/';
+        } catch (err) {
+          console.error(err);
+          alert('Failed to delete note.');
+        }
+      });
+    }
+
+    hydrate();
+  </script>
+
+  <style>
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    .header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .app-title { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);
+      cursor: pointer; text-decoration: none; color: var(--text-color); background: var(--card-bg);
+      transition: background .2s, box-shadow .2s, transform .06s ease-in-out;
+      box-shadow: 0 2px 4px var(--shadow-color);
+      user-select: none;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { color:#fff; background: linear-gradient(83deg,#7c3aed,#2563eb); border-color: transparent; }
+    .danger { border-color:#ef4444; color:#ef4444; }
+
+    .form-wrap {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px var(--shadow-color);
+      padding: 16px;
+    }
+    .field { display: grid; gap: 6px; margin-bottom: 14px; }
+    label { font-weight: 600; }
+    input[type="text"], textarea {
+      padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color);
+      background: var(--card-bg); color: var(--text-color); outline: none;
+    }
+    input[type="text"]:focus, textarea:focus {
+      border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+    }
+    .hint { color: var(--text-secondary); }
+    .form-actions { display:flex; gap:10px; margin-top: 10px; }
+  </style>
+</Layout>

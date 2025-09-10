@@ -1,0 +1,3 @@
+# Ignore generated Astro types and build outputs
+.astro/
+dist/
